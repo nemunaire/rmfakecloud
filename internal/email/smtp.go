@@ -136,6 +136,7 @@ func (b *EmailBuilder) Send() (err error) {
 	}
 	delimeter := "**=myohmy689407924327898338383"
 	//basic email headers
+	msg := fmt.Sprintf("Date: %s\r\n", time.Now().Format(time.RFC1123Z))
 	msg := fmt.Sprintf("From: %s\r\n", from)
 	msg += fmt.Sprintf("To: %s\r\n", b.To)
 	msg += fmt.Sprintf("Subject: %s\r\n", b.Subject)
