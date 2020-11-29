@@ -139,7 +139,9 @@ func (b *EmailBuilder) Send() (err error) {
 	msg := fmt.Sprintf("From: %s\r\n", from)
 	msg += fmt.Sprintf("To: %s\r\n", b.To)
 	msg += fmt.Sprintf("Subject: %s\r\n", b.Subject)
-	// msg += fmt.Sprintf("ReplyTo: %s\r\n", b.ReplyTo)
+	if b.ReplyTo != "" {
+		msg += fmt.Sprintf("Reply-To: %s\r\n", b.ReplyTo)
+	}
 
 	msg += "MIME-Version: 1.0\r\n"
 	msg += fmt.Sprintf("Content-Type: multipart/mixed; boundary=\"%s\"\r\n", delimeter)
