@@ -14,6 +14,8 @@ RUN CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=${VERSION}" -o rmfake
 
 FROM scratch
 EXPOSE 3000
+VOLUME /data
+ENV DATADIR="/data"
 #ENV RMAPI_HWR_HMAC=""
 #ENV RMAPI_HWR_APPLICATIONKEY=""
 #ENV RM_SMTP_SERVER=""
