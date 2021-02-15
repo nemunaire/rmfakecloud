@@ -88,7 +88,7 @@ func NewApp(cfg *config.Config, metaStorer db.MetadataStorer, docStorer storage.
 		router.Use(requestLoggerMiddleware())
 	}
 
-	reactApp := ui.New(cfg, userStorer, codeConnector)
+	reactApp := ui.New(cfg, userStorer, metaStorer, codeConnector)
 
 	app := App{
 		router:        router,

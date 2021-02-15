@@ -203,7 +203,22 @@ func (app *ReactAppWrapper) newCode(c *gin.Context) {
 	c.JSON(http.StatusOK, code)
 }
 func (app *ReactAppWrapper) listDocuments(c *gin.Context) {
-	tree := DocumentTree{}
+	uid := c.GetString(userID)
+	log.Info("Requested: ", uid)
+
+	result, err := app.metaStorer.GetAllMetadata(uid, false)
+	if err != nil {
+		log.Error("Cannot get meta:", err)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error:": "cant get metadata"})
+		return
+	}
+
+	tree := DocumentTree{
+		folderMap: map[string]*Directory{},
+	}
+	for _, meta := range result {
+		tree.Add(meta)
+	}
 
 	c.JSON(http.StatusOK, tree)
 }

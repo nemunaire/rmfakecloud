@@ -20,6 +20,7 @@ type ReactAppWrapper struct {
 	fs            http.FileSystem
 	prefix        string
 	cfg           *config.Config
+	metaStorer    db.MetadataStorer
 	userStorer    db.UserStorer
 	codeConnector CodeGenerator
 }
@@ -42,11 +43,12 @@ func badReq(c *gin.Context, message string) {
 }
 
 // RegisterUI add the react ui
-func New(cfg *config.Config, userStorer db.UserStorer, codeConnector common.CodeConnector) *ReactAppWrapper {
+func New(cfg *config.Config, userStorer db.UserStorer, metadataStorer db.MetadataStorer, codeConnector common.CodeConnector) *ReactAppWrapper {
 	staticWrapper := ReactAppWrapper{
 		fs:            webassets.Assets,
 		prefix:        "/static",
 		cfg:           cfg,
+		metaStorer:    metadataStorer,
 		userStorer:    userStorer,
 		codeConnector: codeConnector,
 	}
