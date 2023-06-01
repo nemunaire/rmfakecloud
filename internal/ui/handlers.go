@@ -537,6 +537,11 @@ func (app *ReactAppWrapper) createIntegration(c *gin.Context) {
 		return
 	}
 
+	if int.Provider == "google" {
+		integrations.GDriveOAuthRedirect(c, &int)
+		return
+	}
+
 	uid := c.GetString(userIDContextKey)
 
 	user, err := app.userStorer.GetUser(uid)
@@ -558,6 +563,12 @@ func (app *ReactAppWrapper) createIntegration(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, int)
+}
+
+func (app *ReactAppWrapper) completeGoogleIntegration(c *gin.Context) {
+	uid := c.GetString(userIDContextKey)
+
+	integrations.GDriveOAuthComplete(app.userStorer, uid, c)
 }
 
 func (app *ReactAppWrapper) getIntegration(c *gin.Context) {
