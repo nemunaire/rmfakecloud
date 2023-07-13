@@ -536,12 +536,17 @@ func (fs *FileSystemStorage) StoreBlob(uid, id string, stream io.Reader, lastGen
 
 	blobPath := path.Join(fs.getUserBlobPath(uid), common.Sanitize(id))
 	log.Info("Write: ", blobPath)
-	file, err := os.Create(blobPath)
+	file, err := os.Create(blobPath + ".tmp")
 	if err != nil {
 		return
 	}
 	defer file.Close()
 	_, err = io.Copy(file, reader)
+	if err != nil {
+		return
+	}
+
+	err = os.Rename(blobPath+".tmp", blobPath)
 	if err != nil {
 		return
 	}
