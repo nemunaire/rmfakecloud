@@ -22,7 +22,6 @@ import (
 	"github.com/ddvk/rmfakecloud/internal/integrations"
 	"github.com/ddvk/rmfakecloud/internal/messages"
 	"github.com/ddvk/rmfakecloud/internal/storage"
-	"github.com/ddvk/rmfakecloud/internal/storage/fs"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/gorilla/websocket"
@@ -743,7 +742,7 @@ func (app *App) syncUpdateRootV3(c *gin.Context) {
 	}
 
 	uid := c.GetString(userIDKey)
-	newgeneration, err := app.blobStorer.StoreBlob(uid, "root", bytes.NewBufferString(rootv3.Hash), rootv3.Generation)
+	newgeneration, err := app.userStorer.UpdateRootIndex(uid, bytes.NewBufferString(rootv3.Hash), rootv3.Generation)
 	if err != nil {
 		log.Error(err)
 		c.AbortWithStatus(http.StatusInternalServerError)
@@ -759,8 +758,8 @@ func (app *App) syncUpdateRootV3(c *gin.Context) {
 func (app *App) syncGetRootV3(c *gin.Context) {
 	uid := c.GetString(userIDKey)
 
-	reader, generation, _, err := app.blobStorer.LoadBlob(uid, "root")
-	if err == fs.ErrorNotFound {
+	roothash, generation, err := app.userStorer.GetRootIndex(uid)
+	if err == storage.ErrorNotFound {
 		log.Warn("No root file found, assuming this is a new account")
 		c.JSON(http.StatusNotFound, gin.H{"message": "root not found"})
 		return
@@ -770,16 +769,9 @@ func (app *App) syncGetRootV3(c *gin.Context) {
 		return
 	}
 
-	roothash, err := io.ReadAll(reader)
-	if err != nil {
-		log.Error(err)
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-
 	c.JSON(http.StatusOK, messages.SyncRootV3{
 		Generation: generation,
-		Hash:       string(roothash),
+		Hash:       roothash,
 	})
 }
 
@@ -816,7 +808,7 @@ func (app *App) blobStorageRead(c *gin.Context) {
 	uid := c.GetString(userIDKey)
 	blobID := common.ParamS(fileKey, c)
 
-	reader, _, size, err := app.blobStorer.LoadBlob(uid, blobID)
+	reader, size, err := app.blobStorer.LoadBlob(uid, blobID)
 	if err != nil {
 		log.Error(err)
 		c.AbortWithStatus(http.StatusInternalServerError)
@@ -831,7 +823,7 @@ func (app *App) blobStorageWrite(c *gin.Context) {
 	uid := c.GetString(userIDKey)
 	blobID := common.ParamS(fileKey, c)
 
-	newgeneration, err := app.blobStorer.StoreBlob(uid, blobID, c.Request.Body, 0)
+	err := app.blobStorer.StoreBlob(uid, blobID, c.Request.Body)
 	if err != nil {
 		log.Error(err)
 		c.AbortWithStatus(http.StatusInternalServerError)
@@ -839,8 +831,7 @@ func (app *App) blobStorageWrite(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, messages.SyncRootV3{
-		Generation: newgeneration,
-		Hash:       string(blobID),
+		Hash: string(blobID),
 	})
 }
 
