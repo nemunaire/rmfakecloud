@@ -8,12 +8,15 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/ddvk/rmfakecloud/internal/app/hub"
 	"github.com/ddvk/rmfakecloud/internal/config"
 	"github.com/ddvk/rmfakecloud/internal/hwr"
 	"github.com/ddvk/rmfakecloud/internal/storage"
 
 	"github.com/ddvk/rmfakecloud/internal/storage/fs"
+	"github.com/ddvk/rmfakecloud/internal/storage/s3"
 	"github.com/ddvk/rmfakecloud/internal/ui"
 
 	"github.com/gin-gonic/gin"
@@ -100,9 +103,19 @@ func NewApp(cfg *config.Config) App {
 
 	fsStorage := fs.NewStorage(cfg)
 	usrs, err := fsStorage.GetUsers()
-
 	if err != nil {
 		log.Warn(err)
+	}
+
+	s3_path_style := true
+	blobStorage, err := s3.NewS3BlobStorage(&aws.Config{
+		Region:           aws.String(cfg.AWSRegion),
+		Credentials:      credentials.NewStaticCredentials(cfg.AWSAccessKey, cfg.AWSSecretKey, ""),
+		Endpoint:         aws.String(cfg.AWSEndpoint),
+		S3ForcePathStyle: aws.Bool(s3_path_style),
+	}, cfg.S3BucketName)
+	if err != nil {
+		log.Error(err)
 	}
 
 	if len(usrs) == 0 {
@@ -138,7 +151,7 @@ func NewApp(cfg *config.Config) App {
 		docStorer:     fsStorage,
 		userStorer:    fsStorage,
 		metaStorer:    fsStorage,
-		blobStorer:    fsStorage,
+		blobStorer:    blobStorage,
 		hub:           ntfHub,
 		codeConnector: codeConnector,
 		hwrClient: &hwr.HWRClient{
@@ -150,7 +163,7 @@ func NewApp(cfg *config.Config) App {
 	uiApp := ui.New(cfg, fsStorage, codeConnector, ntfHub, fsStorage, fsStorage)
 	uiApp.RegisterRoutes(router)
 
-	storageapp := fs.NewApp(cfg, fsStorage)
+	storageapp := storage.NewApp(cfg, fsStorage, fsStorage, blobStorage)
 	storageapp.RegisterRoutes(router)
 
 	return app
