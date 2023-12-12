@@ -4,6 +4,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/ddvk/rmfakecloud/internal/storage"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -15,8 +16,8 @@ type LocalBlobStorage struct {
 
 // GetRootIndex the hash of the root index
 func (p *LocalBlobStorage) GetRootIndex() (hash string, gen int64, err error) {
-	r, gen, _, _, err := p.fs.LoadBlob(p.uid, rootBlob)
-	if err == ErrorNotFound {
+	r, _, _, err := p.fs.LoadBlob(p.uid, storage.RootBlob)
+	if err == storage.ErrorNotFound {
 		log.Info("root not found")
 		return "", gen, nil
 	}
@@ -35,12 +36,12 @@ func (p *LocalBlobStorage) GetRootIndex() (hash string, gen int64, err error) {
 // WriteRootIndex writes the root index
 func (p *LocalBlobStorage) WriteRootIndex(generation int64, roothash string) (int64, error) {
 	r := strings.NewReader(roothash)
-	return p.fs.StoreBlob(p.uid, rootBlob, r, generation)
+	return p.fs.StoreBlob(p.uid, storage.RootBlob, r, generation)
 }
 
 // GetReader reader for a given hash
 func (p *LocalBlobStorage) GetReader(hash string) (io.ReadCloser, error) {
-	r, _, _, _, err := p.fs.LoadBlob(p.uid, hash)
+	r, _, _, err := p.fs.LoadBlob(p.uid, hash)
 	return r, err
 }
 

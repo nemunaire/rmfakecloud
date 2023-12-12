@@ -26,7 +26,6 @@ const cachedTreeName = ".tree"
 
 // serves as root modification log and generation number source
 const historyFile = ".root.history"
-const rootBlob = "root"
 
 // GetCachedTree returns the cached blob tree for the user
 func (fs *FileSystemStorage) GetCachedTree(uid string) (t *models.HashTree, err error) {
@@ -234,7 +233,7 @@ func UpdateTree(tree *models.HashTree, storage *LocalBlobStorage, treeMutation f
 }
 
 // updates the tree and saves the new root
-func updateTree(tree *models.HashTree, storage *LocalBlobStorage, treeMutation func(t *models.HashTree) error) error {
+func updateTree(tree *models.HashTree, blobStorage *LocalBlobStorage, treeMutation func(t *models.HashTree) error) error {
 	for i := 0; i < 3; i++ {
 		err := treeMutation(tree)
 		if err != nil {
@@ -245,15 +244,15 @@ func updateTree(tree *models.HashTree, storage *LocalBlobStorage, treeMutation f
 		if err != nil {
 			return err
 		}
-		err = storage.Write(tree.Hash, rootIndexReader)
+		err = blobStorage.Write(tree.Hash, rootIndexReader)
 		if err != nil {
 			return err
 		}
 
-		gen, err := storage.WriteRootIndex(tree.Generation, tree.Hash)
+		gen, err := blobStorage.WriteRootIndex(tree.Generation, tree.Hash)
 		//the tree has been updated
-		if err == ErrorWrongGeneration {
-			tree.Mirror(storage)
+		if err == storage.ErrorWrongGeneration {
+			tree.Mirror(blobStorage)
 			continue
 		}
 		if err != nil {
@@ -262,7 +261,7 @@ func updateTree(tree *models.HashTree, storage *LocalBlobStorage, treeMutation f
 		log.Info("got new root gen ", gen)
 		tree.Generation = gen
 		//TODO: concurrency
-		err = storage.fs.SaveCachedTree(storage.uid, tree)
+		err = blobStorage.fs.SaveCachedTree(blobStorage.uid, tree)
 
 		if err != nil {
 			return err
@@ -429,53 +428,37 @@ func (fs *FileSystemStorage) GetBlobURL(uid, blobid string, write bool) (docurl 
 	exp = time.Now().Add(time.Minute * config.ReadStorageExpirationInMinutes)
 	strExp := strconv.FormatInt(exp.Unix(), 10)
 
-	scope := ReadScope
+	scope := storage.ReadScope
 	if write {
-		scope = WriteScope
+		scope = storage.WriteScope
 	}
 
-	signature, err := SignURLParams([]string{uid, blobid, strExp, scope}, fs.Cfg.JWTSecretKey)
+	signature, err := storage.SignURLParams([]string{uid, blobid, strExp, scope}, fs.Cfg.JWTSecretKey)
 	if err != nil {
 		return
 	}
 
 	params := url.Values{
-		paramUID:       {uid},
-		paramBlobID:    {blobid},
-		paramExp:       {strExp},
-		paramSignature: {signature},
-		paramScope:     {scope},
+		storage.ParamUID:       {uid},
+		storage.ParamBlobID:    {blobid},
+		storage.ParamExp:       {strExp},
+		storage.ParamSignature: {signature},
+		storage.ParamScope:     {scope},
 	}
 
-	blobURL := uploadRL + routeBlob + "?" + params.Encode()
+	blobURL := uploadRL + storage.RouteBlob + "?" + params.Encode()
 	log.Debugln("blobUrl: ", blobURL)
 	return blobURL, exp, nil
 }
 
 // LoadBlob Opens a blob by id
-func (fs *FileSystemStorage) LoadBlob(uid, blobid string) (reader io.ReadCloser, gen int64, size int64, crc32 string, err error) {
-	generation := int64(0)
+func (fs *FileSystemStorage) LoadBlob(uid, blobid string) (reader io.ReadCloser, size int64, crc32 string, err error) {
 	blobPath := path.Join(fs.getUserBlobPath(uid), common.Sanitize(blobid))
 	log.Debugln("Fullpath:", blobPath)
-	if blobid == rootBlob {
-		historyPath := path.Join(fs.getUserBlobPath(uid), historyFile)
-		lock := fslock.New(historyPath)
-		err := lock.LockWithTimeout(time.Duration(time.Second * 5))
-		if err != nil {
-			log.Error("cannot obtain lock")
-			return nil, 0, 0, "", err
-		}
-		defer lock.Unlock()
-
-		fi, err1 := os.Stat(historyPath)
-		if err1 == nil {
-			generation = generationFromFileSize(fi.Size())
-		}
-	}
 
 	fi, err := os.Stat(blobPath)
 	if err != nil || fi.IsDir() {
-		return nil, generation, 0, "", ErrorNotFound
+		return nil, 0, "", storage.ErrorNotFound
 	}
 
 	osFile, err := os.Open(blobPath)
@@ -495,7 +478,7 @@ func (fs *FileSystemStorage) LoadBlob(uid, blobid string) (reader io.ReadCloser,
 		return
 	}
 	reader = osFile
-	return reader, generation, fi.Size(), crc32, err
+	return reader, fi.Size(), crc32, err
 }
 
 // StoreBlob stores a document
@@ -503,7 +486,7 @@ func (fs *FileSystemStorage) StoreBlob(uid, id string, stream io.Reader, lastGen
 	generation = 1
 
 	reader := stream
-	if id == rootBlob {
+	if id == storage.RootBlob {
 		historyPath := path.Join(fs.getUserBlobPath(uid), historyFile)
 		lock := fslock.New(historyPath)
 		err = lock.LockWithTimeout(time.Duration(time.Second * 5))
@@ -520,7 +503,7 @@ func (fs *FileSystemStorage) StoreBlob(uid, id string, stream io.Reader, lastGen
 
 		if currentGen != lastGen && currentGen > 0 {
 			log.Warnf("wrong generation, currentGen %d, lastGen %d", currentGen, lastGen)
-			return currentGen, ErrorWrongGeneration
+			return currentGen, storage.ErrorWrongGeneration
 		}
 
 		var buf bytes.Buffer
