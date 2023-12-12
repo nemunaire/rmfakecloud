@@ -72,6 +72,13 @@ const (
 	EnvLogFile     = "RM_LOGFILE"
 	envHTTPSCookie = "RM_HTTPS_COOKIE"
 	envTrustProxy  = "RM_TRUST_PROXY"
+
+	envS3AccessKey  = "AWS_ACCESS_KEY_ID"
+	envS3SecretKey  = "AWS_SECRET_ACCESS_KEY"
+	envS3Endpoint   = "AWS_ENDPOINT_URL"
+	envS3Region     = "AWS_DEFAULT_REGION"
+	envS3PathStyle  = "S3_PATH_STYLE"
+	envS3BucketName = "S3_BUCKET_NAME"
 )
 
 // Config config
@@ -90,6 +97,12 @@ type Config struct {
 	HWRHmac           string
 	HTTPSCookie       bool
 	TrustProxy        bool
+	S3AccessKey       string
+	S3SecretKey       string
+	S3Region          string
+	S3Endpoint        string
+	S3PathStyle       bool
+	S3BucketName      string
 }
 
 // Verify verify
@@ -195,6 +208,7 @@ func FromEnv() *Config {
 	}
 
 	trustProxy, _ := strconv.ParseBool(os.Getenv(envTrustProxy))
+	s3PathStyle, _ := strconv.ParseBool(os.Getenv(envS3PathStyle))
 
 	cfg := Config{
 		Port:              port,
@@ -209,7 +223,18 @@ func FromEnv() *Config {
 		HWRHmac:           os.Getenv(envHwrHmac),
 		HTTPSCookie:       httpsCookie,
 		TrustProxy:        trustProxy,
+		S3AccessKey:       os.Getenv(envS3AccessKey),
+		S3SecretKey:       os.Getenv(envS3SecretKey),
+		S3Region:          os.Getenv(envS3Region),
+		S3Endpoint:        os.Getenv(envS3Endpoint),
+		S3PathStyle:       s3PathStyle,
+		S3BucketName:      os.Getenv(envS3BucketName),
 	}
+
+	if cfg.S3Region == "" {
+		cfg.S3Region = "us"
+	}
+
 	return &cfg
 }
 
