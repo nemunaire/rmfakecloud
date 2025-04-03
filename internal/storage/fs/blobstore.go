@@ -73,6 +73,21 @@ func (fs *FileSystemStorage) LoadBlob(uid, blobid string) (reader io.ReadCloser,
 	return reader, fi.Size(), "crc32c=" + hash, err
 }
 
+// BlobExists checks if a blob exists on the filesystem
+func (fs *FileSystemStorage) BlobExists(uid, blobid string) (bool, error) {
+	uid = common.SanitizeUid(uid)
+	blobid = common.Sanitize(blobid)
+	blobPath := path.Join(fs.getUserBlobPath(uid), blobid)
+	fi, err := os.Stat(blobPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return !fi.IsDir(), nil
+}
+
 // StoreBlob stores a document
 func (fs *FileSystemStorage) StoreBlob(uid, id string, fileName string, hash string, stream io.Reader) error {
 	log.Debugf("TODO: check/save etc. write file '%s', hash '%s'", fileName, hash)
