@@ -18,6 +18,7 @@ import (
 	"github.com/ddvk/rmfakecloud/internal/storage"
 
 	"github.com/ddvk/rmfakecloud/internal/storage/fs"
+	"github.com/ddvk/rmfakecloud/internal/storage/s3"
 	"github.com/ddvk/rmfakecloud/internal/ui"
 
 	"github.com/gin-gonic/gin"
@@ -125,6 +126,23 @@ func NewApp(cfg *config.Config) App {
 		log.Warn(err)
 	}
 
+	var blobStorage storage.BlobStorage
+	blobStorage = fsStorage
+
+	if cfg.AWSAccessKey != "" {
+		blobStorage, err = s3.NewS3BlobStorage(s3.Config{
+			AccessKey:  cfg.AWSAccessKey,
+			SecretKey:  cfg.AWSSecretKey,
+			Region:     cfg.AWSRegion,
+			Endpoint:   cfg.AWSEndpoint,
+			PathStyle:  cfg.S3PathStyle,
+			BucketName: cfg.S3BucketName,
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	if len(usrs) == 0 {
 		log.Warn("No users found, the first login will create a user")
 		//TODO: not thread safe
@@ -152,7 +170,7 @@ func NewApp(cfg *config.Config) App {
 		router.Use(requestLoggerMiddleware())
 	}
 
-	blobStorer := storage.NewBlobStorer(fsStorage, fsStorage)
+	blobStorer := storage.NewBlobStorer(blobStorage, fsStorage)
 
 	app := App{
 		router:        router,
@@ -176,7 +194,7 @@ func NewApp(cfg *config.Config) App {
 	uiApp := ui.New(cfg, fsStorage, codeConnector, ntfHub, fsStorage, blobStorer)
 	uiApp.RegisterRoutes(router)
 
-	storageapp := storage.NewApp(cfg, fsStorage, fsStorage, fsStorage, fsStorage)
+	storageapp := storage.NewApp(cfg, fsStorage, fsStorage, fsStorage, blobStorage)
 	storageapp.RegisterRoutes(router)
 
 	return app

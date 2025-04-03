@@ -49,6 +49,14 @@ const (
 	envJWTSecretKey     = "JWT_SECRET_KEY"
 	envRegistrationOpen = "OPEN_REGISTRATION"
 
+	// s3
+	envAWSAccessKey = "AWS_ACCESS_KEY_ID"
+	envAWSSecretKey = "AWS_SECRET_ACCESS_KEY"
+	envAWSRegion    = "AWS_REGION"
+	envAWSEndpoint  = "AWS_ENDPOINT_URL"
+	envS3PathStyle  = "S3_PATH_STYLE"
+	envS3BucketName = "S3_BUCKET_NAME"
+
 	// envSMTPServer the mail server
 	envSMTPServer = "RM_SMTP_SERVER"
 	// envSMTPUsername the username for the mail server
@@ -84,8 +92,8 @@ const (
 
 // Config config
 type Config struct {
-	Port              string
-	StorageURL        string
+	Port       string
+	StorageURL string
 	//only https
 	CloudHost         string
 	DataDir           string
@@ -104,6 +112,13 @@ type Config struct {
 	MQTTPort          string
 	ICEServers        []interface{}
 	HashSchemaVersion string
+
+	AWSAccessKey string
+	AWSSecretKey string
+	AWSRegion    string
+	AWSEndpoint  string
+	S3PathStyle  bool
+	S3BucketName string
 }
 
 // Verify verify
@@ -116,6 +131,16 @@ func (cfg *Config) Verify() {
 
 	if !cfg.HTTPSCookie {
 		log.Warnln(envHTTPSCookie + " is not set, use only when not using https!")
+	}
+
+	if cfg.AWSEndpoint != "" {
+		if _, err := url.Parse(cfg.AWSEndpoint); err != nil {
+			log.Fatal(envAWSEndpoint + " is not a valid URL: " + err.Error())
+		}
+	}
+
+	if cfg.AWSAccessKey != "" && cfg.S3BucketName == "" {
+		log.Fatal("S3_BUCKET_NAME is required when AWS credentials are set")
 	}
 
 	if cfg.SMTPConfig == nil {
@@ -234,6 +259,7 @@ func FromEnv() *Config {
 	}
 
 	trustProxy, _ := strconv.ParseBool(os.Getenv(envTrustProxy))
+	s3PathStyle, _ := strconv.ParseBool(os.Getenv(envS3PathStyle))
 
 	mqttPort := os.Getenv(envMQTTPort)
 	if mqttPort == "" {
@@ -275,7 +301,19 @@ func FromEnv() *Config {
 		MQTTPort:          mqttPort,
 		ICEServers:        iceServers,
 		HashSchemaVersion: hashSchemaVersion,
+
+		AWSAccessKey: os.Getenv(envAWSAccessKey),
+		AWSSecretKey: os.Getenv(envAWSSecretKey),
+		AWSRegion:    os.Getenv(envAWSRegion),
+		AWSEndpoint:  os.Getenv(envAWSEndpoint),
+		S3PathStyle:  s3PathStyle,
+		S3BucketName: os.Getenv(envS3BucketName),
 	}
+
+	if cfg.AWSEndpoint != "" && cfg.AWSRegion == "" {
+		cfg.AWSRegion = "us-west-1"
+	}
+
 	return &cfg
 }
 
@@ -306,6 +344,14 @@ MQTT (for screenshare):
 	%s	ICE servers for WebRTC (JSON array format)
 			Example: [{"urls":["stun:stun.l.google.com:19302"]}]
 			With auth: [{"urls":["turn:server:port"],"username":"user","credential":"pass"}]
+
+S3-compatible storage:
+	%s	Your AWS access key
+	%s	Your AWS secret key
+	%s	Your AWS region
+	%s	If not using official AWS, endpoint to use instead
+	%s	Force path style for non-domain wide buckets (eg. minio, ...)
+	%s	The S3 bucket to use
 
 Emails, smtp:
 	%s
@@ -339,6 +385,13 @@ myScript hwr (needs a developer account):
 
 		envMQTTPort,
 		envICEServers,
+
+		envAWSAccessKey,
+		envAWSSecretKey,
+		envAWSRegion,
+		envAWSEndpoint,
+		envS3PathStyle,
+		envS3BucketName,
 
 		envSMTPServer,
 		envSMTPUsername,
