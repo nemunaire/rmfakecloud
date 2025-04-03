@@ -8,12 +8,15 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/ddvk/rmfakecloud/internal/app/hub"
 	"github.com/ddvk/rmfakecloud/internal/config"
 	"github.com/ddvk/rmfakecloud/internal/hwr"
 	"github.com/ddvk/rmfakecloud/internal/storage"
 
 	"github.com/ddvk/rmfakecloud/internal/storage/fs"
+	"github.com/ddvk/rmfakecloud/internal/storage/s3"
 	"github.com/ddvk/rmfakecloud/internal/ui"
 
 	"github.com/gin-gonic/gin"
@@ -105,6 +108,21 @@ func NewApp(cfg *config.Config) App {
 		log.Warn(err)
 	}
 
+	var blobStorage storage.BlobStorage
+	blobStorage = fsStorage
+
+	if cfg.AWSAccessKey != "" {
+		blobStorage, err = s3.NewS3BlobStorage(&aws.Config{
+			Region:           aws.String(cfg.AWSRegion),
+			Credentials:      credentials.NewStaticCredentials(cfg.AWSAccessKey, cfg.AWSSecretKey, ""),
+			Endpoint:         aws.String(cfg.AWSEndpoint),
+			S3ForcePathStyle: aws.Bool(cfg.S3PathStyle),
+		}, cfg.S3BucketName)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	if len(usrs) == 0 {
 		log.Warn("No users found, the first login will create a user")
 		//TODO: not thread safe
@@ -153,7 +171,7 @@ func NewApp(cfg *config.Config) App {
 	uiApp := ui.New(cfg, fsStorage, codeConnector, ntfHub, fsStorage, blobStorer)
 	uiApp.RegisterRoutes(router)
 
-	storageapp := storage.NewApp(cfg, fsStorage, fsStorage, fsStorage, fsStorage)
+	storageapp := storage.NewApp(cfg, fsStorage, fsStorage, fsStorage, blobStorage)
 	storageapp.RegisterRoutes(router)
 
 	return app
