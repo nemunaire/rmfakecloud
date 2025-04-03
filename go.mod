@@ -5,6 +5,7 @@ go 1.23.3
 toolchain go1.24.1
 
 require (
+	github.com/aws/aws-sdk-go v1.49.0
 	github.com/dropbox/dropbox-sdk-go-unofficial/v6 v6.0.5
 	github.com/gin-gonic/gin v1.9.1
 	github.com/golang-jwt/jwt/v4 v4.5.2
@@ -47,6 +48,7 @@ require (
 	github.com/googleapis/enterprise-certificate-proxy v0.2.3 // indirect
 	github.com/googleapis/gax-go/v2 v2.11.0 // indirect
 	github.com/gorilla/i18n v0.0.0-20150820051429-8b358169da46 // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/jung-kurt/gofpdf v1.16.2 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.7 // indirect

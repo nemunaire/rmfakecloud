@@ -48,6 +48,14 @@ const (
 	envJWTSecretKey     = "JWT_SECRET_KEY"
 	envRegistrationOpen = "OPEN_REGISTRATION"
 
+	// s3
+	envAWSAccessKey = "AWS_ACCESS_KEY_ID"
+	envAWSSecretKey = "AWS_SECRET_ACCESS_KEY"
+	envAWSRegion    = "AWS_REGION"
+	envAWSEndpoint  = "AWS_ENDPOINT_URL"
+	envS3PathStyle  = "S3_PATH_STYLE"
+	envS3BucketName = "S3_BUCKET_NAME"
+
 	// envSMTPServer the mail server
 	envSMTPServer = "RM_SMTP_SERVER"
 	// envSMTPUsername the username for the mail server
@@ -77,8 +85,8 @@ const (
 
 // Config config
 type Config struct {
-	Port              string
-	StorageURL        string
+	Port       string
+	StorageURL string
 	//only https
 	CloudHost         string
 	DataDir           string
@@ -93,6 +101,13 @@ type Config struct {
 	HWRHmac           string
 	HTTPSCookie       bool
 	TrustProxy        bool
+
+	AWSAccessKey string
+	AWSSecretKey string
+	AWSRegion    string
+	AWSEndpoint  string
+	S3PathStyle  bool
+	S3BucketName string
 }
 
 // Verify verify
@@ -105,6 +120,12 @@ func (cfg *Config) Verify() {
 
 	if !cfg.HTTPSCookie {
 		log.Warnln(envHTTPSCookie + " is not set, use only when not using https!")
+	}
+
+	if cfg.AWSEndpoint != "" {
+		if _, err := url.Parse(cfg.AWSEndpoint); err != nil {
+			log.Fatal(envAWSEndpoint + " is not a valid URL: " + err.Error())
+		}
 	}
 
 	if cfg.SMTPConfig == nil {
@@ -170,7 +191,7 @@ func FromEnv() *Config {
 		uploadURL = "https://" + DefaultHost
 	} else {
 		u, err := url.Parse(uploadURL)
-		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == ""  {
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 			log.Fatalf("%s '%s' cannot be parsed, or missing scheme (http|https) %v", EnvStorageURL, uploadURL, err)
 		}
 		if u.Port() != "" {
@@ -211,11 +232,12 @@ func FromEnv() *Config {
 	}
 
 	trustProxy, _ := strconv.ParseBool(os.Getenv(envTrustProxy))
+	s3PathStyle, _ := strconv.ParseBool(os.Getenv(envS3PathStyle))
 
 	cfg := Config{
 		Port:              port,
 		StorageURL:        uploadURL,
-		CloudHost: cloudHost,
+		CloudHost:         cloudHost,
 		DataDir:           dataDir,
 		JWTSecretKey:      dk,
 		JWTRandom:         jwtGenerated,
@@ -226,7 +248,19 @@ func FromEnv() *Config {
 		HWRHmac:           os.Getenv(envHwrHmac),
 		HTTPSCookie:       httpsCookie,
 		TrustProxy:        trustProxy,
+
+		AWSAccessKey: os.Getenv(envAWSAccessKey),
+		AWSSecretKey: os.Getenv(envAWSSecretKey),
+		AWSRegion:    os.Getenv(envAWSRegion),
+		AWSEndpoint:  os.Getenv(envAWSEndpoint),
+		S3PathStyle:  s3PathStyle,
+		S3BucketName: os.Getenv(envS3BucketName),
 	}
+
+	if cfg.AWSEndpoint != "" && cfg.AWSRegion == "" {
+		cfg.AWSRegion = "us-west-1"
+	}
+
 	return &cfg
 }
 
@@ -250,6 +284,14 @@ General:
 	%s	Write logs to file
 	%s Send auth cookie only via https
 	%s	Trust the proxy for X-Forwarded-For/X-Real-IP (set only if behind a proxy)
+
+S3-compatible storage:
+	%s	Your AWS access key
+	%s	Your AWS secret key
+	%s	Your AWS region
+	%s	If not using official AWS, endpoint to use instead
+	%s	Force path style for non-domain wide buckets (eg. minio, ...)
+	%s	The S3 bucket to use
 
 Emails, smtp:
 	%s
@@ -278,6 +320,13 @@ myScript hwr (needs a developer account):
 		EnvLogFile,
 		envHTTPSCookie,
 		envTrustProxy,
+
+		envAWSAccessKey,
+		envAWSSecretKey,
+		envAWSRegion,
+		envAWSEndpoint,
+		envS3PathStyle,
+		envS3BucketName,
 
 		envSMTPServer,
 		envSMTPUsername,
