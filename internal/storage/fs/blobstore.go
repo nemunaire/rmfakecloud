@@ -483,8 +483,8 @@ func (fs *FileSystemStorage) LoadBlob(uid, blobid string) (reader io.ReadCloser,
 		log.Errorf("cannot open blob %v", err)
 		return
 	}
-	//TODO: cache the crc32
-	crc32, err = common.CRC32FromReader(osFile)
+	//TODO: cache the crc32c
+	hash, err = common.CRC32CFromReader(osFile)
 	if err != nil {
 		log.Errorf("cannot get crc32 hash %v", err)
 		return
@@ -495,7 +495,7 @@ func (fs *FileSystemStorage) LoadBlob(uid, blobid string) (reader io.ReadCloser,
 		return
 	}
 	reader = osFile
-	return reader, generation, fi.Size(), crc32, err
+	return reader, generation, fi.Size(), "crc32c=" + hash, err
 }
 
 // StoreBlob stores a document
