@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"strings"
 	"time"
 
@@ -134,6 +135,7 @@ func (fs *S3BlobStorage) LoadBlob(uid, blobid string) (reader io.ReadCloser, siz
 	} else if result.ChecksumSHA256 != nil {
 		hash = "sha256=" + *result.ChecksumSHA256
 	} else {
+		log.Println("non hash registered for %s / %s (size=%d)", uid, blobid, size)
 		// No checksum provided by S3: read the body, compute crc32c, then wrap in a new reader
 		var buf bytes.Buffer
 		if _, e := io.Copy(&buf, result.Body); e != nil {
@@ -142,14 +144,14 @@ func (fs *S3BlobStorage) LoadBlob(uid, blobid string) (reader io.ReadCloser, siz
 			return
 		}
 		result.Body.Close()
-		hash, err = common.CRC32CFromReader(&buf)
+		hash, err = common.CRC32CFromReader(bytes.NewReader(buf.Bytes()))
 		if err != nil {
 			err = fmt.Errorf("s3: compute crc32c for %q: %w", blobid, err)
 			return
 		}
 		hash = "crc32c=" + hash
 		size = int64(buf.Len())
-		reader = io.NopCloser(&buf)
+		reader = io.NopCloser(bytes.NewReader(buf.Bytes()))
 		return
 	}
 
